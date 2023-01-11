@@ -1,0 +1,3 @@
+rootProject.name = 'ajai_gradle'
+include 'for_testing_stuff'
+
