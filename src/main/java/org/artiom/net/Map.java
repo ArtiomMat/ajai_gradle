@@ -75,8 +75,10 @@ public class Map {
 	}
 
 	public void setPixel(int index, byte[] pixel) {
-		for (int i = 0; i < pixelFormat; i++)
-			pixels[index*pixelFormat+i] = pixel[i];
+		/*for (int i = 0; i < pixelFormat; i++)
+			pixels[index*pixelFormat+i] = pixel[i];*/
+		if (pixelFormat >= 0)
+			System.arraycopy(pixel, 0, pixels, index * pixelFormat, pixelFormat);
 	}
 
 	public void setPixel(int x, int y, byte[] pixel) {
@@ -84,8 +86,8 @@ public class Map {
 	}
 
 	public void getPixel(int x, int y, byte[] pixel) {
-		for (int i = 0; i < pixelFormat; i++)
-			pixel[i] = pixels[(y*width+x)*pixelFormat+i];
+		if (pixelFormat >= 0)
+			System.arraycopy(pixels, (y * width + x) * pixelFormat, pixel, 0, pixelFormat);
 	}
 
 	public byte[] getPixel(int x, int y) {
@@ -130,7 +132,7 @@ public class Map {
 				int rgb;
 				byte[] pByte = new byte[pixelFormat];
 				for (int x = 0; x < width; x++) {
-					for (int y = 0; y < width; y++) {
+					for (int y = 0; y < height; y++) {
 						rgb = bf.getRGB(x, y);
 						pByte[0] = (byte)rgb;
 						setPixel(x, y, pByte);
@@ -154,7 +156,7 @@ public class Map {
 				int[] p = new int[pixelFormat];
 				byte[] pByte = new byte[pixelFormat];
 				for (int x = 0; x < width; x++) {
-					for (int y = 0; y < width; y++) {
+					for (int y = 0; y < height; y++) {
 						r.getPixel(x, y, p);
 						pByte[0] = (byte)p[0];
 						pByte[1] = (byte)p[1];

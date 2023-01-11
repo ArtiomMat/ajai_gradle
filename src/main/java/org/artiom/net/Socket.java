@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Random;
+import java.util.HashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -26,7 +26,9 @@ public abstract class Socket implements Runnable {
 	private int port;
 	private DatagramPacket outPacket, inPacket;
 
-	private byte[] privateKey;
+	private byte[] key;
+
+	private HashMap<InetAddress, Integer> sharedKeys;
 
 	/** Byte buffer for its respective packet */
 	protected ByteBuffer outPacketBB, inPacketBB;
@@ -47,8 +49,11 @@ public abstract class Socket implements Runnable {
 	public Socket(int port) throws IOException {
 		socket = new DatagramSocket();
 
-		privateKey = new byte[Constants.PRIVATE_KEY_BYTES_NUM];
-		ThreadLocalRandom.current().nextBytes(privateKey);
+		// Initialize the private key
+		key = new byte[Constants.PRIVATE_KEY_BYTES_NUM];
+		ThreadLocalRandom.current().nextBytes(key);
+
+
 
 		inPacket = createPacket();
 		outPacket = createPacket();
