@@ -1,6 +1,5 @@
 package org.artiom.net;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
@@ -16,19 +15,21 @@ import java.util.concurrent.ThreadLocalRandom;
  * Not only is it immune to MITM attacks, it recognizes them because it has a shared key with other sockets it
  * interacts with.
  * <p>
- * However, recognizing if the packet data is valid or if it's malicious is the responsibility of the inheriting
- * sockets, the class obviously won't check it for you.
+ * Though they have to be eliminated, MITM attacks are rare. The real horror are malicious sockets, that
+ * are custom written or reverse engineered to exploit the protocol, Socket is virtually un-exploitable(according to my
+ * tests of course), now the inheriting classes, they must watch out when building their protocol.
  */
 public abstract class Socket implements Runnable {
-	private DatagramSocket socket;
+	private final DatagramSocket socket;
 	private boolean alive = true;
-	private boolean bound = false;
-	private int port;
-	private DatagramPacket outPacket, inPacket;
+	private final int port;
+	private final DatagramPacket outPacket;
+	private final DatagramPacket inPacket;
 
-	private byte[] key;
+	private final byte[] key;
 
-	private HashMap<InetAddress, Integer> sharedKeys;
+	/** links that have a 0 in them are actually blocked addresses */
+	private final HashMap<InetAddress, Integer> links;
 
 	/** Byte buffer for its respective packet */
 	protected ByteBuffer outPacketBB, inPacketBB;
@@ -53,7 +54,7 @@ public abstract class Socket implements Runnable {
 		key = new byte[Constants.PRIVATE_KEY_BYTES_NUM];
 		ThreadLocalRandom.current().nextBytes(key);
 
-
+		links = new HashMap<>();
 
 		inPacket = createPacket();
 		outPacket = createPacket();
@@ -62,26 +63,23 @@ public abstract class Socket implements Runnable {
 		inPacketBB = createBB(inPacket);
 
 		this.port = port;
+
+		startWrite();
 	}
 
 	/**
 	 * Binds the socket to the port given in the constructor.
-	 * @throws IOException
 	 */
 	public void bind() throws IOException {
 		socket.bind(new InetSocketAddress(InetAddress.getByName("localhost"), port));
-
-		File svDir = new File("./server/");
-		if (!svDir.exists()) {
-			System.out.println("No server directory present, create one?(Y/N)");
-			// TODO
-			svDir.mkdirs();
-			System.out.println("Done.");
-		}
 	}
 
 	public void kill() {
 		alive = false;
+	}
+
+	public void block(InetAddress address) {
+		links.put(address, 0);
 	}
 
 	public boolean canWrite(int size) {
@@ -93,7 +91,7 @@ public abstract class Socket implements Runnable {
 	/**
 	 * Prepares the out packet for writing. Crucial!
 	 */
-	public void startWrite() {
+	private void startWrite() {
 		outPacketBB.clear();
 		outPacketBB.putInt(Constants.PROTOCOL_VERSION);
 	}
@@ -103,38 +101,46 @@ public abstract class Socket implements Runnable {
 	}
 
 	/**
-	 *
+	 * If link isn't established .
 	 * @param to
-	 * @throws IOException
 	 */
 	public void send(InetAddress to) throws IOException {
 		// Encrypting the data
 		byte[] data = outPacketBB.array();
 		int length = outPacketBB.position();
 		for (int i = 0; i < length; i++) {
-			data[i] +=
+//			data[i] +=
 		}
 
 		outPacket.setAddress(to);
 		socket.send(outPacket);
-	}
-
-	/**
-	 * Crucial to make sure if the packet is ok.
-	 * @return If the protocol version of the in packet matches ours.
-	 */
-	public boolean startRead() {
-		return inPacketBB.getInt() == Constants.PROTOCOL_VERSION;
+		startWrite();
 	}
 
 	protected abstract void onReceive(InetAddress from);
 	protected abstract void onReceiveException(Exception e);
+	protected abstract void onLinkStatusChange(boolean mitm);
 
 	@Override
 	public void run() {
 		while (alive) {
 			try {
 				socket.receive(inPacket);
+
+				// Parse the packet real quick
+				InetAddress address = inPacket.getAddress();
+
+				// Check if we already have an existing connection
+				if (links.get(address) != null) {
+					int keyToCheck = links.get(address);
+
+				}
+				else {
+					// Gotta check if there
+				}
+
+//				inPacketBB.getInt() == Constants.PROTOCOL_VERSION
+
 				onReceive(inPacket.getAddress());
 			} catch (IOException e) {
 				onReceiveException(e);
