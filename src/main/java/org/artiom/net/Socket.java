@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -20,6 +21,27 @@ import java.util.concurrent.ThreadLocalRandom;
  * tests of course), now the inheriting classes, they must watch out when building their protocol.
  */
 public abstract class Socket implements Runnable {
+	private static class LinkStatus {
+		/** Is this the first time we come in contact with the address?
+		 * For cases where we send first to the link it's to check if it's responsive, and make sure it accepted us.
+		 * For case where the link sends to us it's to know if we gotta initialize it by the time we decrypt the packet
+		 * */
+		public boolean firstTime=true;
+		/** If we sent a packet and awaiting the next stage of sending the packet, decrypted by us */
+		public boolean sent=false;
+		/** If we are in process of decrypting the packet sent to us by the other party */
+		public boolean decrypting=false;
+		/** Private key we share with the party to make sure mitm attacks don't happen
+		 * TODO: Find out how to actually use it, MITM can just skip over the key if it's place in the start of a packet or modify the key in the first instance */
+		public int key;
+
+		public LinkStatus(int key) {
+			this.key = key;
+		}
+
+		public LinkStatus() {}
+	}
+
 	private final DatagramSocket socket;
 	private boolean alive = true;
 	private final int port;
@@ -29,10 +51,11 @@ public abstract class Socket implements Runnable {
 	private final byte[] key;
 
 	/** links that have a 0 in them are actually blocked addresses */
-	private final HashMap<InetAddress, Integer> links;
+	private final HashMap<InetAddress, LinkStatus> links;
 
 	/** Byte buffer for its respective packet */
 	protected ByteBuffer outPacketBB, inPacketBB;
+
 
 	private DatagramPacket createPacket() {
 		return new DatagramPacket(new byte[Constants.PACKET_SIZE_MAX], Constants.PACKET_SIZE_MAX);
@@ -48,6 +71,8 @@ public abstract class Socket implements Runnable {
 	 * @throws IOException The socket failed to be created.
 	 */
 	public Socket(int port) throws IOException {
+		this.port = port;
+
 		socket = new DatagramSocket();
 
 		// Initialize the private key
@@ -62,8 +87,6 @@ public abstract class Socket implements Runnable {
 		outPacketBB = createBB(outPacket);
 		inPacketBB = createBB(inPacket);
 
-		this.port = port;
-
 		startWrite();
 	}
 
@@ -76,10 +99,6 @@ public abstract class Socket implements Runnable {
 
 	public void kill() {
 		alive = false;
-	}
-
-	public void block(InetAddress address) {
-		links.put(address, 0);
 	}
 
 	public boolean canWrite(int size) {
@@ -100,26 +119,59 @@ public abstract class Socket implements Runnable {
 		outPacketBB.put((byte) fragmentType);
 	}
 
+	void setSendTime() {
+
+	}
+
 	/**
-	 * If link isn't established .
+	 *
+	 * @param bb byte buffer we apply encryption on
+	 * @param factor -1 or 1 purely, the factor used on the value.
+	 */
+	private void applyKey(ByteBuffer bb, int factor) {
+		byte[] data = bb.array();
+		int length = bb.position();
+		for (int i = 0, j = 0; i < length; i++) {
+			if (j >= Constants.PRIVATE_KEY_BYTES_NUM)
+				j = 0;
+			data[i] += key[j++]*factor;
+		}
+	}
+
+	/**
+	 * @return if we are still in process of decrypting a packet we can't send it to that address yet.
 	 * @param to
 	 */
-	public void send(InetAddress to) throws IOException {
-		// Encrypting the data
-		byte[] data = outPacketBB.array();
-		int length = outPacketBB.position();
-		for (int i = 0; i < length; i++) {
-//			data[i] +=
+	public boolean send(InetAddress to) throws IOException {
+		LinkStatus linkStatus = links.get(to);
+		if (linkStatus != null) {
+			if (linkStatus.decrypting)
+				return false;
+		}
+		// Doesn't exist? this is the first time then.
+		else {
+			linkStatus = new LinkStatus(ThreadLocalRandom.current().nextInt());
+			links.put(to, linkStatus);
 		}
 
 		outPacket.setAddress(to);
+
+		// First step for us, send the encrypted packet.
+		applyKey(outPacketBB, 1);
 		socket.send(outPacket);
+		linkStatus.sent = true;
+
 		startWrite();
+		return true;
+	}
+
+	public void setTimeout(int timeoutMillis) throws SocketException {
+		socket.setSoTimeout(timeoutMillis);
 	}
 
 	protected abstract void onReceive(InetAddress from);
 	protected abstract void onReceiveException(Exception e);
-	protected abstract void onLinkStatusChange(boolean mitm);
+	protected abstract void onProtocolMismatch();
 
 	@Override
 	public void run() {
@@ -130,16 +182,49 @@ public abstract class Socket implements Runnable {
 				// Parse the packet real quick
 				InetAddress address = inPacket.getAddress();
 
-				// Check if we already have an existing connection
+				// Check if we already have an existing link
 				if (links.get(address) != null) {
-					int keyToCheck = links.get(address);
+					LinkStatus linkStatus = links.get(address);
+
+					// Second and last step for us, send the decrypted packet(decrypted from our key).
+					if (linkStatus.sent) {
+						applyKey(outPacketBB, -1);
+						socket.send(outPacket);
+						linkStatus.sent = false;
+					}
+					// This means this is the second and last step to receive our packet from the other mf.
+					else if (linkStatus.decrypting) {
+						applyKey(inPacketBB, -1);
+						socket.send(inPacket);
+						// For the first time there is the packet header.
+//						if (linkStatus.firstTime) {
+//							int version = inPacketBB.getInt();
+//							if (version != Constants.PROTOCOL_VERSION) {
+//								// TODO AAAAA
+//							}
+//							linkStatus.firstTime = false;
+//						}
+						linkStatus.decrypting = false;
+					}
+					// This means this is the first step to receive our packet, encrypt it and send it back.
+					else {
+						applyKey(inPacketBB, 1);
+						socket.send(inPacket);
+						linkStatus.decrypting = true;
+					}
 
 				}
+				// If there is no existing link let's create it, it's the first time.
 				else {
-					// Gotta check if there
-				}
+					LinkStatus linkStatus = new LinkStatus();
+					links.put(address, linkStatus);
 
-//				inPacketBB.getInt() == Constants.PROTOCOL_VERSION
+					// FIXME Duplicated code!!!!! from the else aboveeee
+					// This means this is the first step to receive our packet, encrypt it and send it back.
+					applyKey(inPacketBB, 1);
+					socket.send(inPacket);
+					linkStatus.decrypting = true;
+				}
 
 				onReceive(inPacket.getAddress());
 			} catch (IOException e) {
