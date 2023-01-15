@@ -5,17 +5,18 @@ import java.awt.image.*;
 import java.io.File;
 import java.io.IOException;
 
-public class Map {
+// TODO: ONE BIG TODO, TURN EVERYTHING HERE INTO A FLOAT. GOOD LUCK MAN! SHOULD HAVE CALCULATED THIS BEFORE HAND.
 
+public class Map {
 	public static final int L8 = 1;
 	// In 5-6-5 bit format! Not 5-5-5, leaving a useless bit is bad for AI!
 	public static final int RGB16 = 2;
 	public static final int RGB24 = 3;
 	public static final int ARGB32 = 4;
 
-	private byte[] pixels;
-	private int pixelFormat;
-	private int width, height;
+	protected byte[] pixels;
+	protected int pixelFormat;
+	protected int width, height;
 
 	public int getPixelFormat() {
 		return pixelFormat;
@@ -151,7 +152,7 @@ public class Map {
 			}
 			else if (!a && depth == 24 && colors == 3) {
 				pixelFormat = RGB24;
-				System.out.println("LOL");
+				System.out.println("LOL RGB");
 				init(r);
 				int[] p = new int[pixelFormat];
 				byte[] pByte = new byte[pixelFormat];
@@ -172,6 +173,7 @@ public class Map {
 				pixelFormat = ARGB32;
 				/* TODO: Make sure the pixels are in ARGB and not RGBA, maybe test it with
 				image with alpha and see which index corresponds to the alpha. */
+				System.out.println("FUCKCUFFK");
 				supported = false;
 			}
 			else
@@ -243,57 +245,102 @@ public class Map {
 		}
 		return ret;
 	}
-
-	// Null if incorrect inputs
+*/
+	/**
+	 * Performs a pool on the map by getting the average pixel.
+	 * @param dimPool Size of the pool's kernel dimension.
+	 * @param stride The stride size, both on x and y.
+	 * @return New pool-ed map.
+	 */
 	public Map poolAvg(int dimPool, int stride) {
-		if (dim % stride != 0 || dimPool > dim)
+		if (width % stride != 0 || height % stride != 0 || dimPool > width  || dimPool > height)
 			return null;
 
-		Map ret = new Map(dim-stride);
+		Map ret = new Map((width-dimPool)/stride+1, (height-dimPool)/stride+1, pixelFormat);
 
-		for (int x = 0; x <= dim - dimPool; x+=stride) {
-			for (int y = 0; y <= dim - dimPool; y+=stride) {
-				// Getting the average value
-				int value = getPixel(x, y);
-				for (int _x = x; _x < x+stride; _x++) {
-					for (int _y = y+1; _y < y+stride; _y++) {
-						int p = getPixel(_x, _y);
-						value += p;
+		int[] valueInt = new int[pixelFormat];
+		byte[] value = new byte[pixelFormat];
+		byte[] p = new byte[pixelFormat];
+		// The loop for the ret map
+		for (int x = 0; x < ret.getWidth(); x++) {
+			for (int y = 0; y < ret.getHeight(); y++) {
+				int sx = stride*x, sy = stride*y;
+
+				// The loop for the current map, where we pool each pixel for the ret map
+				for (int _x = sx; _x < sx+dimPool; _x++) {
+					for (int _y = sy; _y < sy+dimPool; _y++) {
+						getPixel(_x, _y, p);
+						for (int i = 0; i < pixelFormat; i++)
+							valueInt[i] += p[i]&0xFF;
 					}
 				}
-				ret.setPixel(x/stride, y/stride, value/(dimPool*2));
+
+				for (int i = 0; i < pixelFormat; i++) {
+					valueInt[i] /= (dimPool * dimPool);
+					value[i] = (byte)(valueInt[i]);
+
+					valueInt[i] = 0; // reset
+				}
+
+				ret.setPixel(x, y, value);
 			}
 		}
 
 		return ret;
 	}
 
-	private Map poolMinMax(int dimPool, int stride, boolean max) {
-		if (dim % stride != 0 || dimPool > dim)
-		return null;
+	private float getPixelLuminance(int x, int y) {
+		int i = y*width+x;
+		if (pixelFormat>1)
+			return 0.2126f * pixels[i+0] + 0.7152f * pixels[i+1] + 0.0722f * pixels[i+2];
+		else
+			return (pixels[i]&0xFF)/255.0f;
+	}
 
-		Map ret = new Map(dim-stride);
+	@Deprecated
+	private float getPixelSum(int x, int y) {
+		int sum = 0;
+		for (int i = 0; i < pixelFormat; i++)
+			sum += pixels[y*width+x+i];
+		return sum/(255*3.0f);
+	}
 
-		for (int x = 0; x <= dim - dimPool; x+=stride) {
-			for (int y = 0; y <= dim - dimPool; y+=stride) {
-				// Getting the average value
-				int value = getPixel(x, y);
-				for (int _x = x; _x < x+stride; _x++) {
-					for (int _y = y+1; _y < y+stride; _y++) {
-						int p = getPixel(_x, _y);
-						// Use > if max and < if min
-						if (max) {
-							if (value < p)
-								value = p;
-						}
-						else {
-							if (value > p)
-								value = p;
+
+	/**
+	 *
+	 * @param dimPool
+	 * @param stride
+	 * @param max if we want to use pool max set max to 1 else set it to -1
+	 * @return
+	 */
+	private Map poolMinMax(int dimPool, int stride, int max) {
+		if (width % stride != 0 || height % stride != 0 || dimPool > width  || dimPool > height)
+			return null;
+
+		Map ret = new Map((width-dimPool)/stride+1, (height-dimPool)/stride+1, pixelFormat);
+
+		byte[] p = new byte[pixelFormat];
+		// The loop for the ret map
+		for (int x = 0; x < ret.getWidth(); x++) {
+			for (int y = 0; y < ret.getHeight(); y++) {
+				int sx = stride*x, sy = stride*y;
+
+				float bestL = getPixelLuminance(sx, sy);
+				int bestX=sx, bestY=sy;
+
+				// The loop for the current map, where we pool each pixel for the ret map
+				for (int _x = sx; _x < sx+dimPool; _x++) {
+					for (int _y = sy+1; _y < sy+dimPool; _y++) {
+						getPixel(_x, _y, p);
+						// -1(x-y)>0 = x-y<0
+						if (max*(getPixelLuminance(_x, _y)-bestL) > 0) {
+							bestX = _x;
+							bestY = _y;
 						}
 					}
 				}
 
-				ret.setPixel(x/stride, y/stride, value);
+				ret.setPixel(x, y, getPixel(bestX, bestY));
 			}
 		}
 
@@ -301,12 +348,10 @@ public class Map {
 	}
 
 	public Map poolMax(int dimPool, int stride) {
-		return poolMinMax(dimPool, stride, true);
+		return poolMinMax(dimPool, stride, 1);
 	}
 	public Map poolMin(int dimPool, int stride) {
-		return poolMinMax(dimPool, stride, false);
+		return poolMinMax(dimPool, stride, -1);
 	}
-
-	*/
 
 }

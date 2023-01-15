@@ -58,7 +58,9 @@ public abstract class Socket implements Runnable {
 
 
 	private DatagramPacket createPacket() {
-		return new DatagramPacket(new byte[Constants.PACKET_SIZE_MAX], Constants.PACKET_SIZE_MAX);
+		DatagramPacket p = new DatagramPacket(new byte[Constants.PACKET_SIZE_MAX], Constants.PACKET_SIZE_MAX);
+		p.setPort(port);
+		return p;
 	}
 
 	private ByteBuffer createBB(DatagramPacket p) {
@@ -73,7 +75,7 @@ public abstract class Socket implements Runnable {
 	public Socket(int port) throws IOException {
 		this.port = port;
 
-		socket = new DatagramSocket();
+		socket = new DatagramSocket(null);
 
 		// Initialize the private key
 		key = new byte[Constants.PRIVATE_KEY_BYTES_NUM];
@@ -115,27 +117,31 @@ public abstract class Socket implements Runnable {
 		outPacketBB.putInt(Constants.PROTOCOL_VERSION);
 	}
 
-	protected void write(int fragmentType) throws IndexOutOfBoundsException {
+	public void write(int fragmentType) throws IndexOutOfBoundsException {
 		outPacketBB.put((byte) fragmentType);
 	}
 
-	void setSendTime() {
-
+	public byte read() throws IndexOutOfBoundsException {
+		return outPacketBB.get();
 	}
+
 
 	/**
 	 *
-	 * @param bb byte buffer we apply encryption on
+	 * @param p The packet we apply the key on
 	 * @param factor -1 or 1 purely, the factor used on the value.
 	 */
-	private void applyKey(ByteBuffer bb, int factor) {
-		byte[] data = bb.array();
-		int length = bb.position();
+	private void applyKey(DatagramPacket p, int factor) {
+		int length = p.getLength();
+		byte[] data = p.getData();
+		System.out.println("APPLYING KEY("+key[0]*factor+") ON("+length+"): "+data[0]);
 		for (int i = 0, j = 0; i < length; i++) {
 			if (j >= Constants.PRIVATE_KEY_BYTES_NUM)
 				j = 0;
 			data[i] += key[j++]*factor;
+//			data[i] += key[0]*factor;
 		}
+		System.out.println("APPLIED: "+data[0]);
 	}
 
 	/**
@@ -154,10 +160,12 @@ public abstract class Socket implements Runnable {
 			links.put(to, linkStatus);
 		}
 
-		outPacket.setAddress(to);
 
+		System.out.println("STAGE 1 SEND");
+		outPacket.setLength(outPacketBB.position());
 		// First step for us, send the encrypted packet.
-		applyKey(outPacketBB, 1);
+		outPacket.setAddress(to);
+		applyKey(outPacket, 1);
 		socket.send(outPacket);
 		linkStatus.sent = true;
 
@@ -171,7 +179,7 @@ public abstract class Socket implements Runnable {
 
 	protected abstract void onReceive(InetAddress from);
 	protected abstract void onReceiveException(Exception e);
-	protected abstract void onProtocolMismatch();
+	protected abstract void onProtocolMismatch(InetAddress from);
 
 	@Override
 	public void run() {
@@ -184,31 +192,35 @@ public abstract class Socket implements Runnable {
 
 				// Check if we already have an existing link
 				if (links.get(address) != null) {
+					System.out.println("EXISTS");
 					LinkStatus linkStatus = links.get(address);
 
 					// Second and last step for us, send the decrypted packet(decrypted from our key).
 					if (linkStatus.sent) {
-						applyKey(outPacketBB, -1);
-						socket.send(outPacket);
+						System.out.println("STAGE 2 SEND");
+						applyKey(inPacket, -1);
+						socket.send(inPacket);
 						linkStatus.sent = false;
 					}
 					// This means this is the second and last step to receive our packet from the other mf.
 					else if (linkStatus.decrypting) {
-						applyKey(inPacketBB, -1);
-						socket.send(inPacket);
+						System.out.println("STAGE 2 RECEIVE");
+						applyKey(inPacket, -1);
 						// For the first time there is the packet header.
-//						if (linkStatus.firstTime) {
-//							int version = inPacketBB.getInt();
-//							if (version != Constants.PROTOCOL_VERSION) {
-//								// TODO AAAAA
-//							}
-//							linkStatus.firstTime = false;
-//						}
+						if (linkStatus.firstTime) {
+							int version = inPacketBB.getInt();
+							if (version != Constants.PROTOCOL_VERSION) {
+								onProtocolMismatch(address);
+							}
+							linkStatus.firstTime = false;
+						}
 						linkStatus.decrypting = false;
+						onReceive(inPacket.getAddress());
 					}
 					// This means this is the first step to receive our packet, encrypt it and send it back.
 					else {
-						applyKey(inPacketBB, 1);
+						System.out.println("STAGE 1 RECEIVE");
+						applyKey(inPacket, 1);
 						socket.send(inPacket);
 						linkStatus.decrypting = true;
 					}
@@ -221,13 +233,14 @@ public abstract class Socket implements Runnable {
 
 					// FIXME Duplicated code!!!!! from the else aboveeee
 					// This means this is the first step to receive our packet, encrypt it and send it back.
-					applyKey(inPacketBB, 1);
+					System.out.println("STAGE 1 RECEIVE");
+					applyKey(inPacket, 1);
 					socket.send(inPacket);
 					linkStatus.decrypting = true;
 				}
 
-				onReceive(inPacket.getAddress());
 			} catch (IOException e) {
+				System.out.println("EXCEPTION");
 				onReceiveException(e);
 			}
 		}
