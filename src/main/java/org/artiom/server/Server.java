@@ -28,8 +28,6 @@ public class Server extends Socket {
 
 	@Override
 	protected void onReceive(InetAddress from) {
-		System.out.println("RECEIVED: "+inPacketBB.get()+"\nECHOING...");
-
 	}
 
 	@Override
@@ -44,16 +42,11 @@ public class Server extends Socket {
 
 	public static void main(String[] args) throws IOException {
 		System.out.println("MAIN");
-		Kernel k = new Kernel(new byte[]{1,0,-1, 2,0,-2, 1,0,-1}, 3, 3);
-		Map m = new Map("0.png");
-		Map conv = k.convolve(m, 1);
-		ActivationFunction.relu(conv);
-		conv.save("convolved.png");
 
 		if (args.length > 0) {
 			try {
 				if (Objects.equals(args[0], "s")) {
-					Server sv = new Server(Constants.PORT);
+					Server sv = new Server(6969);
 					Thread serverThread = new Thread(sv);
 					serverThread.start();
 
@@ -61,7 +54,7 @@ public class Server extends Socket {
 				} else {
 					Scanner s = new Scanner(System.in);
 					String str = s.nextLine();
-					Client c = new Client(Constants.PORT);
+					Client c = new Client(6969);
 					Thread clientThread = new Thread(c);
 					clientThread.start();
 

@@ -1,11 +1,9 @@
 package org.artiom.client;
 
-import org.artiom.net.Packet;
 import org.artiom.net.Socket;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.SocketException;
 
 public class Client extends Socket {
 	/**

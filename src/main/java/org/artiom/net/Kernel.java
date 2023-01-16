@@ -2,11 +2,11 @@ package org.artiom.net;
 
 public class Kernel extends Map{
 
-	public Kernel(byte[] pixels, int width, int height, int pixelFormat) {
+	public Kernel(float[] pixels, int width, int height, int pixelFormat) {
 		super(pixels, width, height, pixelFormat);
 	}
 
-	public Kernel(byte[] pixels, int width, int height) {
+	public Kernel(float[] pixels, int width, int height) {
 		super(pixels, width, height);
 	}
 
@@ -25,11 +25,11 @@ public class Kernel extends Map{
 
 		Map ret = new Map((other.getWidth()-width)/stride+1, (other.getHeight()-height)/stride+1, other.getPixelFormat());
 
-		byte[] value = new byte[pixelFormat];
-		byte[] ourPixel = new byte[pixelFormat], otherPixel = new byte[pixelFormat];
+		float[] ourPixel = new float[pixelFormat], otherPixel = new float[pixelFormat];
 		// The loop for the ret map
 		for (int x = 0; x < ret.getWidth(); x++) {
 			for (int y = 0; y < ret.getHeight(); y++) {
+				float[] value = new float[pixelFormat];
 				int sx = stride*x, sy = stride*y;
 
 				// The loop for the current map, where we pool each pixel for the ret map

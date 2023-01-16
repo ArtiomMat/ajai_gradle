@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -21,6 +20,10 @@ import java.util.concurrent.ThreadLocalRandom;
  * tests of course), now the inheriting classes, they must watch out when building their protocol.
  */
 public abstract class Socket implements Runnable {
+	protected static final int PACKET_SIZE_MAX = 4096;
+	protected static final int PRIVATE_KEY_BYTES_NUM = 4;
+	protected static final int PROTOCOL_VERSION = 1;
+
 	private static class LinkStatus {
 		/** Is this the first time we come in contact with the address?
 		 * For cases where we send first to the link it's to check if it's responsive, and make sure it accepted us.
@@ -58,7 +61,7 @@ public abstract class Socket implements Runnable {
 
 
 	private DatagramPacket createPacket() {
-		DatagramPacket p = new DatagramPacket(new byte[Constants.PACKET_SIZE_MAX], Constants.PACKET_SIZE_MAX);
+		DatagramPacket p = new DatagramPacket(new byte[PACKET_SIZE_MAX], PACKET_SIZE_MAX);
 		p.setPort(port);
 		return p;
 	}
@@ -78,7 +81,7 @@ public abstract class Socket implements Runnable {
 		socket = new DatagramSocket(null);
 
 		// Initialize the private key
-		key = new byte[Constants.PRIVATE_KEY_BYTES_NUM];
+		key = new byte[PRIVATE_KEY_BYTES_NUM];
 		ThreadLocalRandom.current().nextBytes(key);
 
 		links = new HashMap<>();
@@ -104,7 +107,7 @@ public abstract class Socket implements Runnable {
 	}
 
 	public boolean canWrite(int size) {
-		if (outPacketBB.position() + size >= Constants.PACKET_SIZE_MAX)
+		if (outPacketBB.position() + size >= PACKET_SIZE_MAX)
 			return false;
 		return true;
 	}
@@ -114,7 +117,7 @@ public abstract class Socket implements Runnable {
 	 */
 	private void startWrite() {
 		outPacketBB.clear();
-		outPacketBB.putInt(Constants.PROTOCOL_VERSION);
+		outPacketBB.putInt(PROTOCOL_VERSION);
 	}
 
 	public void write(int fragmentType) throws IndexOutOfBoundsException {
@@ -136,7 +139,7 @@ public abstract class Socket implements Runnable {
 		byte[] data = p.getData();
 		System.out.println("APPLYING KEY("+key[0]*factor+") ON("+length+"): "+data[0]);
 		for (int i = 0, j = 0; i < length; i++) {
-			if (j >= Constants.PRIVATE_KEY_BYTES_NUM)
+			if (j >= PRIVATE_KEY_BYTES_NUM)
 				j = 0;
 			data[i] += key[j++]*factor;
 //			data[i] += key[0]*factor;
@@ -209,7 +212,7 @@ public abstract class Socket implements Runnable {
 						// For the first time there is the packet header.
 						if (linkStatus.firstTime) {
 							int version = inPacketBB.getInt();
-							if (version != Constants.PROTOCOL_VERSION) {
+							if (version != PROTOCOL_VERSION) {
 								onProtocolMismatch(address);
 							}
 							linkStatus.firstTime = false;

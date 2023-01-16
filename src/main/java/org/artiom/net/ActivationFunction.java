@@ -14,10 +14,17 @@ public class ActivationFunction {
 	 */
 	public static final int TANH = 4;
 
-//	public static void relu(Map m) {
-//		byte[] pixels = m.getPixels();
-//		for (int i = 0; i < pixels.length; i++)
-//			if ((int)(pixels[i])& < 0)
-//				pixels[i] = 0;
-//	}
+	public static void relu(Map m) {
+		float[] pixels = m.getPixels();
+		for (int i = 0; i < pixels.length; i++)
+			if (pixels[i] < 0)
+				pixels[i] = 0;
+	}
+
+	public static void leakyRelu(Map m) {
+		float[] pixels = m.getPixels();
+		for (int i = 0; i < pixels.length; i++)
+			if (pixels[i] < 0)
+				pixels[i] *= 0.0001f;
+	}
 }
