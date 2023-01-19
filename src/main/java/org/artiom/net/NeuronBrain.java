@@ -8,10 +8,6 @@ public class NeuronBrain {
 	private float[] outputs = null;
 	private NeuronLayer[] layers;
 
-	public NeuronBrain(Object config) {
-
-	}
-
 	protected void setInputs(Float[] inputs) {
 		newInputs = true;
 		this.inputs = inputs;

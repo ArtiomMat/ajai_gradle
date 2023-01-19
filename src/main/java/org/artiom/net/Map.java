@@ -7,18 +7,16 @@ import java.io.IOException;
 import java.util.Arrays;
 
 public class Map {
-	public static final int FORMAT_L = 1;
-	public static final int FORMAT_RGB = 3;
 
 	/**
 	 * A pixel's channel value ranges from 0f to 1f
 	 */
-	protected float[] pixels;
-	protected int pixelFormat;
+	protected Float[] pixels;
+	protected int channels;
 	protected int width, height;
 
-	public int getPixelFormat() {
-		return pixelFormat;
+	public int getChannels() {
+		return channels;
 	}
 
 	public int getWidth() {
@@ -29,7 +27,7 @@ public class Map {
 		return height;
 	}
 
-	public float[] getPixels() {
+	public Float[] getPixels() {
 		return pixels;
 	}
 
@@ -38,14 +36,14 @@ public class Map {
 	 * @param pixels Doesn't copy the array.
 	 */
 	public Map(
-			float[] pixels,
+			Float[] pixels,
 			int width,
 			int height,
 			int pixelFormat
 	) {
 		this.width = width;
 		this.height = height;
-		this.pixelFormat = pixelFormat;
+		this.channels = pixelFormat;
 
 		/*this.pixels = new byte[width*height*pixelFormat];
 		if (pixels.length == this.pixels.length) {
@@ -57,17 +55,17 @@ public class Map {
 	}
 
 	/** Assumes pixelType=L8 */
-	public Map(float[] pixels, int width, int height) {
-		this(pixels, width, height, FORMAT_L);
+	public Map(Float[] pixels, int width, int height) {
+		this(pixels, width, height, 1);
 	}
 
 	/** Assumes pixelType=L8 */
 	public Map(int width, int height) {
-		this(new float[width*height*FORMAT_L], width, height, FORMAT_L);
+		this(new Float[width*height*1], width, height, 1);
 	}
 
 	public Map(int width, int height, int pixelFormat) {
-		this(new float[width*height*pixelFormat], width, height, pixelFormat);
+		this(new Float[width*height*pixelFormat], width, height, pixelFormat);
 	}
 
 	public Map(String fp) throws IOException {
@@ -75,17 +73,17 @@ public class Map {
 	}
 
 	public void setPixel(int x, int y, float[] pixel) {
-		for (int i = 0; i < pixelFormat; i++)
-			pixels[(y*width+x)*pixelFormat+i] = pixel[i];
+		for (int i = 0; i < channels; i++)
+			pixels[(y*width+x)* channels +i] = pixel[i];
 	}
 
 	public void getPixel(int x, int y, float[] pixel) {
-		for (int i = 0; i < pixelFormat; i++)
-			pixel[i] = pixels[(y*width+x)*pixelFormat+i];
+		for (int i = 0; i < channels; i++)
+			pixel[i] = pixels[(y*width+x)* channels +i];
 	}
 
 	public float[] getPixel(int x, int y) {
-		float[] pixel = new float[pixelFormat];
+		float[] pixel = new float[channels];
 		getPixel(x, y, pixel);
 		return pixel;
 	}
@@ -94,7 +92,7 @@ public class Map {
 		width = r.getWidth();
 		height = r.getHeight();
 
-		pixels = new float[width*height*pixelFormat];
+		pixels = new Float[width*height* channels];
 	}
 
 	// Make sure the image is 1:1 ratio, otherwise it won't be accepted
@@ -113,7 +111,7 @@ public class Map {
 
 			boolean supported = true;
 			if (!a && depth == 8 && colors == 1) {
-				pixelFormat = FORMAT_L;
+				channels = 1;
 
 				System.out.println(cm.getColorSpace());
 
@@ -121,7 +119,7 @@ public class Map {
 				// We use bf.getRGB in grayscale because r.getPixel
 				// seems to return contrasted values, no idea why.
 				int rgb;
-				float[] pFloat = new float[pixelFormat];
+				float[] pFloat = new float[channels];
 				for (int x = 0; x < width; x++) {
 					for (int y = 0; y < height; y++) {
 						rgb = bf.getRGB(x, y);
@@ -132,9 +130,9 @@ public class Map {
 				}
 			}
 			else if (!a && depth == 24 && colors == 3) {
-				pixelFormat = FORMAT_RGB;
+				channels = 3;
 				init(r);
-				float[] pFloat = new float[pixelFormat];
+				float[] pFloat = new float[channels];
 				for (int x = 0; x < width; x++) {
 					for (int y = 0; y < height; y++) {
 						r.getPixel(x, y, pFloat);
@@ -147,9 +145,9 @@ public class Map {
 				}
 			}
 			else if (a && depth == 32 && colors == 3) {
-				pixelFormat = FORMAT_RGB;
+				channels = 3;
 				/* TODO: Skip over the alpha channel */
-				System.out.println("RGBA Not supported yet");
+				System.out.println("ARGB Not supported yet");
 				supported = false;
 			}
 			else
@@ -173,23 +171,23 @@ public class Map {
 
 	public void save(String fp) throws IOException {
 		int type;
-		if (pixelFormat == FORMAT_L)
+		if (channels == 1)
 			type = BufferedImage.TYPE_BYTE_GRAY;
 		else
 			type = BufferedImage.TYPE_INT_RGB;
 		BufferedImage bi = new BufferedImage(width, height, type);
 
-		float[] pixel = new float[pixelFormat];
-		int[] pixelInt = new int[pixelFormat];
+		float[] pixel = new float[channels];
+		int[] pixelInt = new int[channels];
 		for(int x = 0; x < width; x++) {
 			for(int y = 0; y < height; y++) {
 				getPixel(x, y, pixel);
-				for (int i = 0; i < pixelFormat; i++)
+				for (int i = 0; i < channels; i++)
 					pixelInt[i] = (int) (pixel[i]*255);
 				System.out.println(Arrays.toString(pixelInt));
 
 				int rgb;
-				 if (pixelFormat == 3)
+				 if (channels == 3)
 					rgb = (pixelInt[0] << 16) | (pixelInt[1] << 8) | pixelInt[2];
 				else
 					rgb = (pixelInt[0] << 16) | (pixelInt[0] << 8) | pixelInt[0];
@@ -223,13 +221,13 @@ public class Map {
 		if (width % stride != 0 || height % stride != 0 || dimPool > width  || dimPool > height)
 			return null;
 
-		Map ret = new Map((width-dimPool)/stride+1, (height-dimPool)/stride+1, pixelFormat);
+		Map ret = new Map((width-dimPool)/stride+1, (height-dimPool)/stride+1, channels);
 
-		float[] p = new float[pixelFormat];
+		float[] p = new float[channels];
 		// The loop for the ret map
 		for (int x = 0; x < ret.getWidth(); x++) {
 			for (int y = 0; y < ret.getHeight(); y++) {
-				float[] value = new float[pixelFormat];
+				float[] value = new float[channels];
 
 				int sx = stride*x, sy = stride*y;
 
@@ -237,13 +235,13 @@ public class Map {
 				for (int _x = sx; _x < sx+dimPool; _x++) {
 					for (int _y = sy; _y < sy+dimPool; _y++) {
 						getPixel(_x, _y, p);
-						for (int i = 0; i < pixelFormat; i++) {
+						for (int i = 0; i < channels; i++) {
 							value[i] += p[i];
 						}
 					}
 				}
 
-				for (int i = 0; i < pixelFormat; i++) {
+				for (int i = 0; i < channels; i++) {
 					value[i] /= (dimPool * dimPool);
 				}
 
@@ -256,9 +254,9 @@ public class Map {
 
 	@Deprecated
 	private float getPixelLuminance(int i) {
-		i*=pixelFormat;
+		i*= channels;
 
-		if (pixelFormat>1)
+		if (channels >1)
 			return 0.2126f * pixels[i+0] + 0.7152f * pixels[i+1] + 0.0722f * pixels[i+2];
 //			return 0.299f*pixels[i+0] + 0.587f*pixels[i+1] + 0.114f*pixels[i+2];
 		else
@@ -272,14 +270,14 @@ public class Map {
 
 	/** Creates a map based on luminance(not really actually uses average of the RGB's sum), for FORMAT_RGB maps */
 	public Map getLuminanceMap() {
-		if (pixelFormat == FORMAT_L)
+		if (channels == 1)
 			return this;
 
-		Map ret = new Map(width, height, FORMAT_L);
+		Map ret = new Map(width, height, 1);
 
 		// We don't use luminance actually
 		for (int i = 0; i < ret.pixels.length; i++) {
-			float sum = pixels[i*pixelFormat] + pixels[i*pixelFormat+1] + pixels[i*pixelFormat+2];
+			float sum = pixels[i* channels] + pixels[i* channels +1] + pixels[i* channels +2];
 			ret.pixels[i] = sum/3;
 		}
 
@@ -288,8 +286,8 @@ public class Map {
 
 	private float getPixelAvg(int x, int y) {
 		float sum = 0;
-		for (int i = 0; i < pixelFormat; i++)
-			sum += pixels[(y*width+x)*pixelFormat+i];
+		for (int i = 0; i < channels; i++)
+			sum += pixels[(y*width+x)* channels +i];
 		return sum/3;
 	}
 
@@ -305,9 +303,9 @@ public class Map {
 		if (width % stride != 0 || height % stride != 0 || dimPool > width  || dimPool > height)
 			return null;
 
-		Map ret = new Map((width-dimPool)/stride+1, (height-dimPool)/stride+1, pixelFormat);
+		Map ret = new Map((width-dimPool)/stride+1, (height-dimPool)/stride+1, channels);
 
-		float[] p = new float[pixelFormat];
+		float[] p = new float[channels];
 		// The loop for the ret map
 		for (int x = 0; x < ret.getWidth(); x++) {
 			for (int y = 0; y < ret.getHeight(); y++) {

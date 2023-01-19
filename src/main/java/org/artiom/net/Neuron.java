@@ -1,11 +1,21 @@
 package org.artiom.net;
 
-public class Neuron {
-	private NeuronLayer layer;
+import java.util.concurrent.ThreadLocalRandom;
 
-	private Float output;
+class Neuron {
+	protected Float[] inputs;
+	protected float[] weights;
+	protected float bias;
 
-	private Neuron[] inputs;
-	private float[] weights;
-	private float bias;
+	protected Float output;
+
+	protected Neuron(Float[] inputs) {
+		this.inputs = inputs;
+
+		bias = ThreadLocalRandom.current().nextFloat();
+
+		weights = new float[inputs.length];
+		for (int i = 0; i < inputs.length; i++)
+			weights[i] = ThreadLocalRandom.current().nextFloat();
+	}
 }
