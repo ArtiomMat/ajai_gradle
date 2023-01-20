@@ -2,14 +2,14 @@ package org.artiom.net;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-class Neuron {
+class NeuronUnit {
 	protected Float[] inputs;
 	protected float[] weights;
 	protected float bias;
 
 	protected Float output;
 
-	protected Neuron(Float[] inputs) {
+	protected NeuronUnit(Float[] inputs) {
 		this.inputs = inputs;
 
 		bias = ThreadLocalRandom.current().nextFloat();

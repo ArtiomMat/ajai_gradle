@@ -1,18 +1,18 @@
 package org.artiom.net;
 
-import java.io.IOException;
-
 class NeuronLayer {
-	protected Neuron[] neurons;
+	protected NeuronUnit[] neurons;
 	protected Float[] outputs;
+
+	protected boolean
 
 	protected NeuronLayer(NeuronLayer prev, int neuronsNum) {
 		outputs = new Float[neuronsNum];
-		neurons = new Neuron[neuronsNum];
+		neurons = new NeuronUnit[neuronsNum];
 
 		for (int i = 0; i < neuronsNum; i++) {
 			outputs[i] = 0f;
-			neurons[i] = new Neuron(prev.outputs);
+			neurons[i] = new NeuronUnit(prev.outputs);
 		}
 	}
 }

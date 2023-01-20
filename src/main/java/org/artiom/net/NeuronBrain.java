@@ -3,10 +3,19 @@ package org.artiom.net;
 import java.io.IOException;
 
 public class NeuronBrain {
+
+
 	private boolean newInputs;
-	private Float[] inputs = null;
-	private float[] outputs = null;
+	private Float[] inputs;
+	private float[] outputs;
 	private NeuronLayer[] layers;
+
+	public NeuronBrain(int unitLayersNum, int[] cfg) {
+		for (int i = 0; i < cfg.length; i++) {
+			if (cfg[i] == LayerType.UNITS)
+
+		}
+	}
 
 	protected void setInputs(Float[] inputs) {
 		newInputs = true;

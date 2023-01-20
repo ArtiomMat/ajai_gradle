@@ -1,25 +1,32 @@
 package org.artiom.net;
 
-public class Kernel extends Map{
+class KernelUnit {
+	protected Map[] inputs;
 
-	public Kernel(Float[] pixels, int width, int height, int pixelFormat) {
+	/** The filter has as many channels as the inputs, the output is a feature map with the same  */
+	protected Map filter;
+	protected float bias;
+	protected int stride;
+
+
+	public KernelUnit(Float[] pixels, int width, int height, int pixelFormat) {
 		super(pixels, width, height, pixelFormat);
 	}
 
-	public Kernel(Float[] pixels, int width, int height) {
+	public KernelUnit(Float[] pixels, int width, int height) {
 		super(pixels, width, height);
 	}
 
-	public Kernel(int width, int height) {
+	public KernelUnit(int width, int height) {
 		super(width, height);
 	}
 
-	public Kernel(int width, int height, int pixelFormat) {
+	public KernelUnit(int width, int height, int pixelFormat) {
 		super(width, height, pixelFormat);
 	}
 
-	public Map convolve(Map other, int stride) {
-		if (other.getWidth() % stride != 0 || other.getHeight() % stride != 0 || width > other.getWidth()  || height > other.getWidth()
+	protected Map convolve(int stride) {
+		/*if (other.getWidth() % stride != 0 || other.getHeight() % stride != 0 || width > other.getWidth()  || height > other.getWidth()
 		|| channels != other.getChannels())
 			return null;
 
@@ -47,7 +54,7 @@ public class Kernel extends Map{
 			}
 		}
 
-		return ret;
+		return ret;*/
 	}
 
 }
