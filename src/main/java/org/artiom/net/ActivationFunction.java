@@ -78,4 +78,5 @@ public class ActivationFunction {
 	public static void tanh(Map m) {
 		tanh(m.getPixels());
 	}
+
 }

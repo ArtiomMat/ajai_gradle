@@ -1,20 +1,21 @@
 package org.artiom.net;
 
 public enum LayerType {
-	/** For kernel brain for example it is the KernelLayer
-	 * <p>
-	 * Extra arguments for kernel layer: width, height, stride, number of kernels
-	 * <p>
-	 * Extra arguments for kernel layer: size
+	/**
+	 * Hyperparameters: width, height, stride, number of kernels
 	 * */
-	UNITS,
+	KERNELS,
+	/**
+	 * Hyperparameters: number of neurons
+	 * */
+	NEURONS,
 
 	DROPOUT,
 
 	/**
 	 * Exclusive to kernel brains.
 	 * <p>
-	 * Extra arguments for kernel layer: width AND height, stride
+	 * Hyperparameters: width AND height, stride
 	 */
 	MAX_POOL,
 	MIN_POOL,
